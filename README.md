@@ -23,3 +23,5 @@ Defined the variables above, put this script into scheduler!
 TESTED and WORKED 100% on RouterOS 6.35.4
 This script made in 2015.
 This comment added in 2018.
+
+### I WILL NOT DEVELOP THIS STUFF IN THE FUTURE, PLEASE DONT ASK ME! Thanks.

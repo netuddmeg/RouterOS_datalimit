@@ -1,0 +1,200 @@
+:global wan;
+
+#############################################
+### VARS BEGINING HERE
+#############################################
+
+### here is our WAN device name
+:set wan "ether1";
+
+:global trafficMessage1;
+:global trafficMessage2;
+:global trafficMessage3;
+:set trafficMessage2 "UPLOADED data=";
+:set trafficMessage1 "DOWNLOADED data=";
+:set trafficMessage3 "SPEED=";
+
+### email recipients
+:global emailTo "somebody@xxx.net";
+:global emailTo2 "somebody2@xxx.net";
+:global emailTo3 "somebody3@xxx.net";
+#############################################
+
+### email configuration to send emails
+:global emailFrom "anotherone@xxx.net";
+:global emailSmtp "10.0.0.1";
+:global emailPort "25";
+:global emailPw "topsecretpassword";
+:global emailTls "yes";
+:global emailUser "smtpauthuser@xxx.net";
+#############################################
+
+:global tx;
+:global rx;
+
+#############################################
+### IMPORTANT VARS BEGINING HERE
+#############################################
+### here are the limits
+:global limitDOWN;
+:global limitUP;
+
+###limitUP/DOWN means MB
+:set limitDOWN "200";
+:set limitUP "270";
+
+### rxtxLIMIT means kbps
+:global rxtxLIMIT "500";
+:global rxSPEED;
+:global txSPEED;
+
+### set up percentage of early warning, in case "100" then no early warning
+:global percentage
+:set percentage "90"
+#############################################
+### IMPORTANT VARS ENDING HERE
+#############################################
+
+#############################################
+### VARS ENDING HERE
+#############################################
+
+:global logfile script;
+
+#############################################
+
+
+### check tx speed on the WAN interface
+/interface monitor-traffic [/interface find name=$wan] once do={
+:global txSPEED (tx-bits-per-second / 1024);
+:put $txSPEED;
+}
+
+### check rx speed on the WAN interface
+/interface monitor-traffic [/interface find name=$wan] once do={
+:global rxSPEED (rx-bits-per-second / 1024);
+:put $rxSPEED;
+}
+
+:log info  message="RX speed is now: $rxSPEED kbps / TX speed is now: $txSPEED kbps"
+
+
+### check uploaded MB
+/interface {
+
+    :local fname
+
+        :set tx [get $wan tx-byte]
+        :set tx ($tx / 1048576)
+        :set fname [get $wan name]
+        :set fname ("INT_tx_".$fname.".txt")
+        /file {
+            :local f [find name=$fname]
+            :if ([:len $f] = 0) do={
+                print file=$fname where size=-1;
+                :delay 2s
+                set [find name=$fname] contents="$tx";
+            } else={
+                :local fcontent [get $f contents];
+                :if ($fcontent < $tx) do={
+                    :put "$fcontent < $tx"
+                    :set fcontent $tx
+                    set $f contents="$fcontent";
+                } else={                             
+                    :if ($fcontent > $tx) do={
+                        :put "$fcontent > $tx"
+###                        :set fcontent [$tx - $fcontent]
+                        :set fcontent [$fcontent + $tx]
+                        set $f contents="$fcontent";
+
+                    }
+                }
+            }
+        }
+
+}
+
+
+
+### check downloaded MB
+/interface {
+
+    :local fname
+
+        :set rx [get $wan rx-byte]
+        :set rx ($rx / 1048576)
+        :set fname [get $wan name]
+        :set fname ("INT_rx_".$fname.".txt")
+        /file {
+            :local f [find name=$fname]
+            :if ([:len $f] = 0) do={
+                print file=$fname where size=-1;
+                :delay 2s
+                set [find name=$fname] contents="$rx";
+            } else={
+                :local fcontent [get $f contents];
+                :if ($fcontent < $rx) do={
+                    :put "$fcontent < $rx"
+                    :set fcontent $rx
+                    set $f contents="$fcontent";
+                } else={                             
+                    :if ($fcontent > $rx) do={
+                        :put "$fcontent > $rx"
+###                        :set fcontent [$rx - $fcontent]
+                        :set fcontent [$fcontent + $rx]
+                        set $f contents="$fcontent";
+                    }
+                }
+            }
+        }
+
+}
+
+
+### send email if up AND downloaded data is more than one of the limit(s)
+
+:global summa ($rx + $tx)
+
+:global rxtxlimit  ($limitUP + $limitDOWN)
+
+:if ($summa >= ($limitDOWN/100*$percentage) || $summa >= ($limitUP/100*$percentage) || $rxSPEED > $rxtxLIMIT  || $rxSPEED > $rxtxLIMIT)  do={
+
+### body of email
+:global limitMessage;
+:set limitMessage "
+
+This email sent to $emailTo, at $date $time because the up/download data volume will reach a set limit ($limitDOWN MB) or the current speed has reached the specified maximum (now: $rxSPEED kbps / $txSPEED kbps). The  down/upload speed is higher than usual.
+
+Downloaded data is now: $rx MB
+Uploaded data is now: $tx MB
+Summa: $summa MB
+Percentage of warning level: $percentage %
+
+Download speed is now: $rxSPEED kbps.
+Upload speed is now: $txSPEED kbps.
+
+Used interface is: $wan
+
+These limits have been defined manually:
+Limit of the downloaded AND uploaded data is now: $limitDOWN MB, $limitUP MB.
+Limit of the up/download speed is now: $rxtxLIMIT kbps.
+
+Contact info: admin@xxx.net
+"
+
+### put some info to logs too
+:log warning message="$trafficMessage2 $tx MB / $trafficMessage1 $rx MB and sum is: $summa MB" ;
+:log info  message="Sending email to $emailTo, $emailTo2 because we will reach any LIMIT soon: $limitDOWN MB.";
+
+### sending email to recipient #1
+/tool e-mail set from=$emailFrom password=$emailPw port=$emailPort start-tls=$emailTls user=$emailUser;
+/tool e-mail send body="$limitMessage" from=$emailFrom  password=$emailPw port=$emailPort server=$emailSmtp start-tls=$emailTls subject="$trafficMessage1 $rx MB and $trafficMessage2 $tx MB, $trafficMessage3 $rxSPEED kbps / $txSPEED kbps" to=$emailTo user=$emailUser;
+
+### sending email to recipient #2
+/tool e-mail set from=$emailFrom password=$emailPw port=$emailPort start-tls=$emailTls user=$emailUser;
+/tool e-mail send body="$limitMessage" from=$emailFrom  password=$emailPw port=$emailPort server=$emailSmtp start-tls=$emailTls subject="$trafficMessage1 $rx MB and $trafficMessage2 $tx MB, $trafficMessage3 $rxSPEED kbps / $txSPEED kbps" to=$emailTo2 user=$emailUser;
+
+}
+
+
+#else={:log warning message="Nothing special, so we dont sending email...";};

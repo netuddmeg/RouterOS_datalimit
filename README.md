@@ -1,10 +1,10 @@
 ### RouterOS_datalimit
 
-RouterOS script for watching data, speed limits
+RouterOS script for watching/reporting traffic, speed limits, etc.
 
 WHATISIT? (AS I REMEMBER CORRECTLY) 
 
-Measuring uploaded and downloaded MBs and up/download speed on the WAN interface and sending warning if the limit has been reached.
+This script measure the uploaded and downloaded MBs and up/downloading speed on the WAN interface and send warning if the limit has been reached.
 
 The trigger is alive if:
 
@@ -14,11 +14,11 @@ OR
 OR
 upload speed Mb/s OR download speed Mb/s
 
-...reached (one of) limit(s).
+...reached (one of) the limit(s).
 
 Maybe I cannot remember well for last 3-4 years, please DONT BE ANGRY if I have mistake this comment.
 
-Defined the variables above, put this script into scheduler!
+Define the variables above, and put this script into scheduler!
 
 TESTED and WORKED 100% on RouterOS 6.35.4
 This script made in 2015.
